@@ -19,7 +19,8 @@ disponível:
 Também classifica os modelos **TTS gratuitos** de cada plataforma:
 - **Nvidia** — exige o selo `Free Endpoint` (modelos apenas "Download Available" são downloads, não endpoints);
 - **OpenCode Zen** — palavras-chave de TTS no id dos modelos free;
-- **OpenRouter** — modalidade de saída `speech` (ex.: Fish Audio S2.1 Pro Free, Deepgram Flux TTS).
+- **OpenRouter** — modalidade de saída `speech` (ex.: Fish Audio S2.1 Pro Free, Deepgram Flux TTS);
+- **Cloudflare Workers AI** — parseia os cards da [página de modelos TTS](https://developers.cloudflare.com/workers-ai/models/?tasks=Text-to-Speech), mantém só a versão mais nova de cada família (aura-1 cai fora quando existe aura-2) e agrupa variantes de locale (`aura-2-en` + `aura-2-es` → `aura-2 (en-es)`).
 
 ## Exemplo de saída
 
@@ -93,7 +94,7 @@ Para ativar:
 7. **TTS** — filtra em cada catálogo os modelos com palavras-chave de
    text-to-speech, mantendo apenas os gratuitos: na Nvidia exige o selo
    "Free Endpoint"; no OpenRouter também aceita free com saída de áudio
-   (`speech`).
+   (`speech`); no Cloudflare aplica as regras de versão/locale da família.
 
 ## Requisitos
 

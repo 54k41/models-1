@@ -276,6 +276,80 @@ def fetch_free_top_models():
 
 
 # --------------------------------------------------------------------------
+# 3b. Modelos TTS do Cloudflare Workers AI (fonte exclusiva da seção TTS)
+# --------------------------------------------------------------------------
+
+CLOUDFLARE_TTS_URL = ("https://developers.cloudflare.com/workers-ai/models/"
+                      "?tasks=Text-to-Speech")
+LOCAIS = {"en", "es", "pt", "fr", "de", "it", "ja", "ko", "zh", "nl", "pl", "ru", "tr", "ar"}
+
+
+def fetch_cloudflare_tts():
+    """Modelos Text-to-Speech do Cloudflare Workers AI.
+
+    Parseia os cards da página de modelos filtrada por 'Text-to-Speech'
+    (HTML estático com atributos data-model-*). Duas regras aplicadas:
+      1. mesma família de modelo: mantém só a versão mais nova —
+         'aura-1' cai fora quando existe 'aura-2-*' (falso positivo);
+      2. variantes de locale da mesma versão são agrupadas numa entrada só:
+         'aura-2-en' + 'aura-2-es' -> 'aura-2 (en-es)'.
+    """
+    html = _get(CLOUDFLARE_TTS_URL)
+    # o filtro ?tasks= é aplicado via JS; no HTML vêm todos os modelos —
+    # por isso o card traz data-model-task e filtramos aqui de verdade
+    labels = re.findall(
+        r'data-model-id="([^"]+)"\s+data-model-label="([^"]+)"\s+'
+        r'data-model-href="([^"]+)"[^>]*?data-model-task="([^"]*)"', html)
+    busca = re.findall(r'data-search="([^"]*)"', html)
+    cards = []
+    for i, (mid, label, href, task) in enumerate(labels):
+        if task != "Text-to-Speech":
+            continue
+        desc = ""
+        if i < len(busca) and " " + label + " " in busca[i]:
+            desc = busca[i].split(" " + label + " ", 1)[-1].strip()
+        cards.append({"slug": mid, "label": label, "href": href,
+                      "descricao": desc})
+
+    # família/versão/locale: 'aura-2-en' -> raiz 'aura', base 'aura-2', locale 'en'
+    #                        'melotts'    -> raiz/base 'melotts', sem versão/locale
+    def partes(label):
+        p = label.split("-")
+        locale = p[-1] if len(p) > 1 and p[-1] in LOCAIS else None
+        resto = p[:-1] if locale else p
+        ver = int(resto[1]) if len(resto) > 1 and resto[1].isdigit() else None
+        return resto[0], "-".join(resto), ver, locale
+
+    raizes = {}
+    for c in cards:
+        raiz, _, ver, _ = partes(c["label"])
+        if ver is not None:
+            raizes[raiz] = max(raizes.get(raiz, 0), ver)
+    recentes = [c for c in cards
+                if partes(c["label"])[2] in (None, raizes.get(partes(c["label"])[0]))]
+
+    grupos = {}
+    for c in recentes:
+        _, base, _, locale = partes(c["label"])
+        grupos.setdefault(base, {"locales": [], "card": c})
+        if locale:
+            grupos[base]["locales"].append(locale)
+
+    modelos = []
+    for base in sorted(grupos):
+        g = grupos[base]
+        nome = f"{base} ({'-'.join(sorted(g['locales']))})" if g["locales"] else base
+        card = g["card"]
+        modelos.append({
+            "nome": nome,
+            "slug": card["slug"],
+            "descricao": card["descricao"],
+            "url": "https://developers.cloudflare.com" + card["href"],
+        })
+    return modelos
+
+
+# --------------------------------------------------------------------------
 # 3. Normalização e comparação
 # --------------------------------------------------------------------------
 
@@ -352,7 +426,9 @@ def buscar_tts(catalogo, modelos):
     - Zen: catálogo já vem filtrado para os modelos free; busca por palavras-
       chave no id.
     - OpenRouter: catálogo já vem filtrado para os $0; casa palavras-chave OU
-      modelos com saída de áudio (text->audio), ex. geradores de fala/áudio.
+      modelos com saída de fala (output_modalities 'speech').
+    - Cloudflare: fonte exclusiva de TTS (fetch_cloudflare_tts já aplica as
+      regras de versão/locale); os modelos Workers AI têm uso gratuito diario.
     """
     if catalogo == "nvidia":
         return [m for m in modelos
@@ -362,6 +438,8 @@ def buscar_tts(catalogo, modelos):
         return [m for m in modelos
                 if m.get("speech_out")
                 or _eh_tts(" ".join([m["nome"], m["slug"], m["descricao"]]))]
+    if catalogo == "cloudflare":
+        return list(modelos)
     return [m for m in modelos
             if _eh_tts(" ".join([m["nome"], m["slug"]]))]
 
@@ -407,7 +485,8 @@ def imprimir_catalogo(indice_titulo, catalogo, matches, apenas_free_zen=False):
 
 
 # nomes curtos dos catálogos para a listagem "Modelo - site"
-SITE_NOMES = {"nvidia": "Nvidia", "zen": "OpenCode Zen", "openrouter": "OpenRouter"}
+SITE_NOMES = {"nvidia": "Nvidia", "zen": "OpenCode Zen", "openrouter": "OpenRouter",
+              "cloudflare": "Cloudflare"}
 
 
 def imprimir(resultados_por_tier, rankings, tts_resultados):
@@ -433,8 +512,8 @@ def imprimir(resultados_por_tier, rankings, tts_resultados):
 
     print("\nTTS:\n")
     j = 0
-    for catalogo in CATALOGOS:
-        for mod in tts_resultados.get(catalogo, []):
+    for catalogo, mods in tts_resultados.items():
+        for mod in mods:
             j += 1
             print(f"  {j}. {mod['nome']} - {SITE_NOMES[catalogo]}")
     if j == 0:
@@ -475,9 +554,11 @@ def imprimir_detalhado(resultados_por_tier, rankings, tts_resultados,
     print("# CLASSIFICAÇÃO: TTS (TEXT-TO-SPEECH) — apenas modelos free")
     print(f"# critério: nome/id/descrição contém {', '.join(TTS_PADROES)}")
     print(f"{'#' * larg}")
-    for i, catalogo in enumerate(CATALOGOS, start=1):
-        titulo, url_base, _ = CATALOGOS[catalogo]
-        modelos_tts = tts_resultados.get(catalogo, [])
+    for i, (catalogo, modelos_tts) in enumerate(tts_resultados.items(), start=1):
+        if catalogo == "cloudflare":
+            titulo, url_base = ("CLOUDFLARE WORKERS AI", "developers.cloudflare.com/workers-ai/models")
+        else:
+            titulo, url_base, _ = CATALOGOS[catalogo]
         print(f"\n  ◆ {i}. {titulo}  ({url_base})")
         if not modelos_tts:
             print("    Nenhum modelo TTS free neste catálogo.")
@@ -512,12 +593,12 @@ def escrever_html(resultados_por_tier, rankings, tts_resultados, gerado_em):
                 })
     tts = [{"nome": m["nome"], "plataforma": SITE_NOMES[c],
             "descricao": (m.get("descricao") or "")[:140]}
-           for c in CATALOGOS for m in tts_resultados.get(c, [])]
+           for c, mods in tts_resultados.items() for m in mods]
 
     dados = json.dumps({"gerado_em": gerado_em.isoformat(timespec="seconds"),
                         "smart": smart, "tts": tts}, ensure_ascii=False)
     chip = {"Nvidia": "#76b900", "OpenCode Zen": "#f5a623",
-            "OpenRouter": "#8b5cf6"}
+            "OpenRouter": "#8b5cf6", "Cloudflare": "#f6821f"}
     chips_css = "\n".join(
         f'.chip[data-site="{nome}"]{{background:{cor}22;color:{cor};border:1px solid {cor}55}}'
         for nome, cor in chip.items())
@@ -642,6 +723,7 @@ def main():
         nome: buscar_tts(nome, dados)
         for nome, dados in catalogos_dados.items()
     }
+    tts_resultados["cloudflare"] = fetch_cloudflare_tts()
 
     escrever_html(resultados_por_tier, rankings, tts_resultados, datetime.now())
 
