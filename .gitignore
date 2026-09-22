@@ -1,0 +1,19 @@
+# pasta com as versões antigas do projeto (não publicar)
+old/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# saídas geradas pelo app (recriadas a cada execução)
+resultados.json
+index.html
+
+# sistema/IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
