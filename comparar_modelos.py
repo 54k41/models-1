@@ -236,8 +236,15 @@ def _dedup(itens):
 
 
 def fetch_smartest_models():
-    """Tier 1: top 25 do ranking 'Smartest LLMs' (best/smartest)."""
-    return _dedup(_extrair_itemlist(_get(MODELGREP_TIER1_URL)))
+    """Tier 1: top 25 do ranking 'Smartest LLMs' (best/smartest), com score.
+
+    A listagem não traz a pontuação; ela vem da página individual de cada
+    modelo no modelgrep (mesma técnica do Tier 2) — são ~25 requisições.
+    """
+    modelos = _dedup(_extrair_itemlist(_get(MODELGREP_TIER1_URL)))
+    for mod in modelos:
+        mod["score"] = _score_do_modelo(mod["url"])
+    return modelos
 
 
 def _score_do_modelo(url_modelo):
