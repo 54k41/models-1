@@ -53,6 +53,22 @@ A cada execução o app também gera um **`index.html`** autocontido (dados
 embutidos, sem servidor) com os resultados em formato visual — basta abrir
 com duplo clique no navegador.
 
+## Página publicada (GitHub Pages)
+
+Este repositório inclui um workflow do GitHub Actions
+(`.github/workflows/atualizar-pagina.yml`) que **roda o script duas vezes ao
+dia** (06:00 e 18:00, horário de Brasília) e publica o `index.html` gerado no
+**GitHub Pages** — a página fica sempre atualizada, sem ninguém rodar nada.
+
+Para ativar:
+
+1. Faça push deste repositório para o GitHub;
+2. Em **Settings → Pages → Build and deployment**, escolha
+   **Source: GitHub Actions**;
+3. Pronto — a página ficará em `https://<seu-usuário>.github.io/<repo>/`
+   e o workflow também pode ser executado manualmente na aba **Actions**
+   (botão *Run workflow*).
+
 ## Como funciona
 
 1. **Tier 1** — extrai o JSON-LD (schema.org `ItemList`) embutido em

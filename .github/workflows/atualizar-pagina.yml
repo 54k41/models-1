@@ -1,0 +1,47 @@
+name: Atualizar página
+
+on:
+  schedule:
+    # duas vezes ao dia — horários em UTC (BRT = UTC-3)
+    - cron: "0 9 * * *"   # 09:00 UTC = 06:00 BRT
+    - cron: "0 21 * * *"  # 21:00 UTC = 18:00 BRT
+  workflow_dispatch: {}   # permite rodar manualmente pela aba Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rodar comparar_modelos.py (gera index.html)
+        run: python comparar_modelos.py
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Publicar artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
