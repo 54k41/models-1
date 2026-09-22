@@ -586,12 +586,12 @@ def escrever_html(resultados_por_tier, rankings, tts_resultados, gerado_em):
                         break
             if plataformas:
                 smart.append({
-                    "nome": rank["nome"],
+                    "nome": rank["nome"].replace(" (free)", ""),
                     "posicao": rank.get("posicao"),
                     "score": rank.get("score"),
                     "plataformas": plataformas,
                 })
-    tts = [{"nome": m["nome"], "plataforma": SITE_NOMES[c],
+    tts = [{"nome": m["nome"].replace(" (free)", ""), "plataforma": SITE_NOMES[c],
             "descricao": (m.get("descricao") or "")[:140]}
            for c, mods in tts_resultados.items() for m in mods]
 
