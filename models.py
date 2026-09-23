@@ -671,8 +671,8 @@ def escrever_html(resultados_por_tier, rankings, tts_resultados, gerado_em):
 <body>
 <main>
   <h1>Smart Models &amp; TTS</h1>
-  <p class="sub">Rankings do modelgrep cruzados com os catálogos gratuitos de
-     Nvidia Build, OpenCode Zen e OpenRouter.</p>
+  <p class="sub">Rankings de modelos gratuitos da Nvidia Build, OpenCode Zen,
+     OpenRouter, CloudFlare e Cline.</p>
   <section id="smart">
     <h2>Smart Models</h2>
     <ol id="smart-list"></ol>
