@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-comparar_modelos.py — Compara os rankings "Smart Models" do modelgrep com três
+models.py — Compara os rankings "Smart Models" do modelgrep com três
 catálogos de APIs:
 
   Rankings (modelgrep):
@@ -26,9 +26,9 @@ Como funciona:
      com cada catálogo: correspondência exata + aproximada (fuzzy).
 
 Uso:
-    python comparar_modelos.py            # compara e imprime na tela
-    python comparar_modelos.py --json     # também salva resultados.json
-    python comparar_modelos.py --limiar 0.90   # ajusta o corte do fuzzy
+    python models.py            # compara e imprime na tela
+    python models.py --json     # também salva resultados.json
+    python models.py --limiar 0.90   # ajusta o corte do fuzzy
 
 Sem dependências externas — apenas a biblioteca padrão do Python.
 """
@@ -715,7 +715,7 @@ for (const [i, m] of DADOS.tts.entries()) {
 
 document.getElementById("rodape").textContent =
   "Gerado em " + new Date(DADOS.gerado_em).toLocaleString("pt-BR") +
-  " por comparar_modelos.py";
+  " por models.py";
 </script>
 </body>
 </html>

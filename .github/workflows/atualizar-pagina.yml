@@ -31,8 +31,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Rodar comparar_modelos.py (gera index.html)
-        run: python comparar_modelos.py
+      - name: Rodar models.py (gera index.html)
+        run: python models.py
 
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5

@@ -43,11 +43,11 @@ TTS:
 ## Uso
 
 ```bash
-python comparar_modelos.py              # saída simples: "Modelo - Onde está"
-python comparar_modelos.py --detalhado  # slugs, URLs, descrições e pontuações
-python comparar_modelos.py --json       # também salva resultados.json
-python comparar_modelos.py --zen-todos  # inclui os modelos pagos do Zen
-python comparar_modelos.py --fuzzy      # ativa correspondência aproximada
+python models.py              # saída simples: "Modelo - Onde está"
+python models.py --detalhado  # slugs, URLs, descrições e pontuações
+python models.py --json       # também salva resultados.json
+python models.py --zen-todos  # inclui os modelos pagos do Zen
+python models.py --fuzzy      # ativa correspondência aproximada
 ```
 
 A cada execução o app também gera um **`index.html`** autocontido (dados
