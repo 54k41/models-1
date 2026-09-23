@@ -15,11 +15,13 @@ disponível:
 | **Nvidia Build** | endpoints com selo `Free Endpoint` no `nimType` (via API de catálogo do NGC) |
 | **OpenCode Zen** | modelos com `free` no id ([API pública](https://opencode.ai/zen/v1/models)) |
 | **OpenRouter** | modelos com flag `is_free` ([catálogo completo](https://openrouter.ai/api/frontend/v1/catalog/models)) |
+| **Google AI Studio** | modelos `Flash`/`Flash-Lite` — só a versão mais nova de cada família ([docs](https://ai.google.dev/gemini-api/docs/models)) |
 
 Também classifica os modelos **TTS gratuitos** de cada plataforma:
 - **Nvidia** — exige o selo `Free Endpoint` (modelos apenas "Download Available" são downloads, não endpoints);
 - **OpenCode Zen** — palavras-chave de TTS no id dos modelos free;
 - **OpenRouter** — modalidade de saída `speech` (ex.: Fish Audio S2.1 Pro Free, Deepgram Flux TTS);
+- **Google AI Studio** — nomes terminados em "Flash TTS" (freemium); "Pro TTS" é pago e fica de fora;
 - **Cloudflare Workers AI** — parseia os cards da [página de modelos TTS](https://developers.cloudflare.com/workers-ai/models/?tasks=Text-to-Speech), mantém só a versão mais nova de cada família (aura-1 cai fora quando existe aura-2) e agrupa variantes de locale (`aura-2-en` + `aura-2-es` → `aura-2 (en-es)`).
 
 ## Exemplo de saída
