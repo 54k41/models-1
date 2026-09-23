@@ -74,6 +74,7 @@ CATALOGOS = {
     "nvidia": ("NVIDIA BUILD", "build.nvidia.com/models", ""),
     "zen": ("OPENCODE ZEN", "opencode.ai/docs/zen", " — apenas modelos 'free'"),
     "openrouter": ("OPENROUTER", "openrouter.ai/models", " — apenas modelos free (is_free)"),
+    "cline": ("CLINE", "cline.bot", " — apenas modelos anunciados free"),
 }
 
 # rankings do modelgrep comparados contra os catálogos
@@ -350,6 +351,38 @@ def fetch_cloudflare_tts():
 
 
 # --------------------------------------------------------------------------
+# 3c. Modelos gratuitos no Cline (via o projeto model-a, que monitora os
+#     anúncios oficiais do Cline — ex.: "X is FREE in Cline")
+# --------------------------------------------------------------------------
+
+CLINE_DATA_URL = "https://54k41.github.io/model-a/data.json"
+
+
+def fetch_cline_models():
+    """Modelos anunciados como gratuitos no Cline.
+
+    Fonte: o projeto model-a (https://54k41.github.io/model-a/), que publica
+    um data.json com os modelos e os anúncios oficiais do Cline que os
+    tornaram gratuitos. Slugs vêm no formato 'fabricante/modelo'; o match
+    com o ranking usa a parte final (slug_base).
+    """
+    dados = json.loads(_get(CLINE_DATA_URL))
+    modelos = []
+    for m in dados.get("models", []):
+        slug = m.get("slug") or ""
+        if not slug:
+            continue
+        modelos.append({
+            "nome": m.get("name") or slug,
+            "slug": slug,
+            "slug_base": slug.split("/")[-1],
+            "descricao": "; ".join(m.get("sources") or []),
+            "url": m.get("url") or f"https://modelgrep.com/models/{slug}",
+        })
+    return modelos
+
+
+# --------------------------------------------------------------------------
 # 3. Normalização e comparação
 # --------------------------------------------------------------------------
 
@@ -486,7 +519,7 @@ def imprimir_catalogo(indice_titulo, catalogo, matches, apenas_free_zen=False):
 
 # nomes curtos dos catálogos para a listagem "Modelo - site"
 SITE_NOMES = {"nvidia": "Nvidia", "zen": "OpenCode Zen", "openrouter": "OpenRouter",
-              "cloudflare": "Cloudflare"}
+              "cloudflare": "Cloudflare", "cline": "Cline"}
 
 
 def imprimir(resultados_por_tier, rankings, tts_resultados):
@@ -598,7 +631,8 @@ def escrever_html(resultados_por_tier, rankings, tts_resultados, gerado_em):
     dados = json.dumps({"gerado_em": gerado_em.isoformat(timespec="seconds"),
                         "smart": smart, "tts": tts}, ensure_ascii=False)
     chip = {"Nvidia": "#76b900", "OpenCode Zen": "#f5a623",
-            "OpenRouter": "#8b5cf6", "Cloudflare": "#f6821f"}
+            "OpenRouter": "#8b5cf6", "Cloudflare": "#f6821f",
+            "Cline": "#35c28f"}
     chips_css = "\n".join(
         f'.chip[data-site="{nome}"]{{background:{cor}22;color:{cor};border:1px solid {cor}55}}'
         for nome, cor in chip.items())
@@ -627,6 +661,7 @@ def escrever_html(resultados_por_tier, rankings, tts_resultados, gerado_em):
   .score { color: #f5a623; font-size: .8rem; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { font-size: .72rem; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .virg { color: #8b949e; font-size: .8rem; align-self: center; }
   """ + chips_css + """
   .vazio { color: #8b949e; font-style: italic; padding: 9px 12px; }
   footer { margin-top: 40px; color: #8b949e; font-size: .78rem;
@@ -661,7 +696,7 @@ for (const [i, m] of DADOS.smart.entries()) {
   li.innerHTML = `<span class="num">${i + 1}.</span>
     <span class="nome">${m.nome}${score}</span>
     <span class="chips">${m.plataformas.map(p =>
-      `<span class="chip" data-site="${p}">${p}</span>`).join("")}</span>`;
+      `<span class="chip" data-site="${p}">${p}</span>`).join('<span class="virg">, </span>')}</span>`;
   smart.appendChild(li);
 }
 
@@ -707,6 +742,7 @@ def main():
         "nvidia": fetch_nvidia_models(),
         "zen": fetch_zen_models(apenas_free=not args.zen_todos),
         "openrouter": fetch_openrouter_models(),
+        "cline": fetch_cline_models(),
     }
     rankings = {"tier1": fetch_smartest_models()}
     rankings["tier2"] = fetch_free_top_models()
@@ -722,6 +758,7 @@ def main():
     tts_resultados = {
         nome: buscar_tts(nome, dados)
         for nome, dados in catalogos_dados.items()
+        if nome != "cline"  # Cline entra só no Smart Models (não tem TTS no data.json)
     }
     tts_resultados["cloudflare"] = fetch_cloudflare_tts()
 
