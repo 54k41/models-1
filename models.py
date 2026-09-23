@@ -715,7 +715,7 @@ for (const [i, m] of DADOS.tts.entries()) {
 
 document.getElementById("rodape").textContent =
   "Gerado em " + new Date(DADOS.gerado_em).toLocaleString("pt-BR") +
-  " por models.py";
+  " · gerado por さかい.";
 </script>
 </body>
 </html>
