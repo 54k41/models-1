@@ -35,6 +35,7 @@ Sem dependências externas — apenas a biblioteca padrão do Python.
 
 import argparse
 import difflib
+import http.cookiejar
 import json
 import re
 import ssl
@@ -64,8 +65,12 @@ SSL_CTX = ssl.create_default_context()
 
 
 def _get(url: str) -> str:
+    # cookiejar evita loops de redirect (ex.: ai.google.dev redireciona para
+    # setar cookie e volta ao mesmo URL)
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=30, context=SSL_CTX) as resp:
+    with opener.open(req, timeout=30) as resp:
         return resp.read().decode("utf-8", errors="replace")
 
 
@@ -75,6 +80,8 @@ CATALOGOS = {
     "zen": ("OPENCODE ZEN", "opencode.ai/docs/zen", " — apenas modelos 'free'"),
     "openrouter": ("OPENROUTER", "openrouter.ai/models", " — apenas modelos free (is_free)"),
     "cline": ("CLINE", "cline.bot", " — apenas modelos anunciados free"),
+    "google": ("GOOGLE AI STUDIO", "ai.google.dev/gemini-api/docs/models",
+               " — apenas Flash, a versão mais nova de cada família"),
 }
 
 # rankings do modelgrep comparados contra os catálogos
@@ -383,6 +390,80 @@ def fetch_cline_models():
 
 
 # --------------------------------------------------------------------------
+# 3d. Google AI Studio (docs oficiais: ai.google.dev/gemini-api/docs/models)
+# --------------------------------------------------------------------------
+
+GOOGLE_MODELS_URL = "https://ai.google.dev/gemini-api/docs/models"
+
+
+def _parsear_cards_gemini(html):
+    """Extrai os cards da página: (id, nome de exibição, descrição)."""
+    cards = []
+    for m in re.finditer(
+            r'<h3 class="hide-from-toc" id="([^"]+)" data-text="([^"]+)"[^>]*>', html):
+        gid, nome = m.groups()
+        fim_desc = html.find("</p>", m.end())
+        ini_desc = html.find("<p", m.end())
+        desc = ""
+        if ini_desc != -1 and ini_desc < fim_desc:
+            desc = re.sub(r"<[^>]+>", " ", html[ini_desc:fim_desc])
+            desc = re.sub(r"\s+", " ", desc).strip()
+        cards.append({"id": gid, "nome": nome, "descricao": desc})
+    return cards
+
+
+def _versao(id_gemini):
+    """'gemini-3.8-flash' -> ((3, 8), 'gemini-X-flash')"""
+    m = re.match(r"gemini-([0-9][0-9.]*)-", id_gemini)
+    if not m:
+        return None, None
+    ver = tuple(int(p) for p in m.group(1).split("."))
+    esqueleto = re.sub(r"gemini-[0-9][0-9.]*-", "gemini-X-", id_gemini)
+    return ver, esqueleto
+
+
+def fetch_google_models():
+    """Modelos Flash do Google AI Studio (todos os Flash têm tier gratuito).
+
+    Fonte: página oficial de modelos do Gemini API. Regras:
+      - só ids no formato 'gemini-<versão>-flash' ou '-flash-lite'
+        (sem preview/image/live/etc.);
+      - de cada família (ex.: 'gemini-X-flash'), mantém apenas a versão mais
+        nova — gemini-3.8-flash fica, 3.7/3.6/3.5/... caem fora.
+    """
+    cards = _parsear_cards_gemini(_get(GOOGLE_MODELS_URL))
+    por_familia = {}
+    for c in cards:
+        if not re.match(r"^gemini-[0-9][0-9.]*-flash(-lite)?$", c["id"]):
+            continue
+        ver, esqueleto = _versao(c["id"])
+        atual = por_familia.get(esqueleto)
+        if atual is None or ver > atual[0]:
+            por_familia[esqueleto] = (ver, c)
+    return [{
+        "nome": c["nome"],
+        "slug": c["id"],
+        "descricao": c["descricao"],
+        "url": f"{GOOGLE_MODELS_URL}#{c['id']}",
+    } for _, c in por_familia.values()]
+
+
+def fetch_google_tts():
+    """Modelos TTS gratuitos do Google AI Studio.
+
+    Regra: só nomes terminados em 'Flash TTS' (freemium). 'Pro TTS' é pago e
+    fica de fora; variantes 'Preview' têm o sufixo removido do id.
+    """
+    cards = _parsear_cards_gemini(_get(GOOGLE_MODELS_URL))
+    return [{
+        "nome": c["nome"],
+        "slug": re.sub(r"-preview$", "", c["id"]),
+        "descricao": c["descricao"],
+        "url": f"{GOOGLE_MODELS_URL}#{c['id']}",
+    } for c in cards if c["nome"].endswith("Flash TTS")]
+
+
+# --------------------------------------------------------------------------
 # 3. Normalização e comparação
 # --------------------------------------------------------------------------
 
@@ -519,7 +600,8 @@ def imprimir_catalogo(indice_titulo, catalogo, matches, apenas_free_zen=False):
 
 # nomes curtos dos catálogos para a listagem "Modelo - site"
 SITE_NOMES = {"nvidia": "Nvidia", "zen": "OpenCode Zen", "openrouter": "OpenRouter",
-              "cloudflare": "Cloudflare", "cline": "Cline"}
+              "cloudflare": "Cloudflare", "cline": "Cline",
+              "google": "Google AI Studio"}
 
 
 def imprimir(resultados_por_tier, rankings, tts_resultados):
@@ -632,7 +714,7 @@ def escrever_html(resultados_por_tier, rankings, tts_resultados, gerado_em):
                         "smart": smart, "tts": tts}, ensure_ascii=False)
     chip = {"Nvidia": "#76b900", "OpenCode Zen": "#f5a623",
             "OpenRouter": "#8b5cf6", "Cloudflare": "#f6821f",
-            "Cline": "#35c28f"}
+            "Cline": "#35c28f", "Google AI Studio": "#4285f4"}
     chips_css = "\n".join(
         f'.chip[data-site="{nome}"]{{background:{cor}22;color:{cor};border:1px solid {cor}55}}'
         for nome, cor in chip.items())
@@ -672,7 +754,7 @@ def escrever_html(resultados_por_tier, rankings, tts_resultados, gerado_em):
 <main>
   <h1>Smart Models &amp; TTS</h1>
   <p class="sub">Rankings de modelos gratuitos da Nvidia Build, OpenCode Zen,
-     OpenRouter, CloudFlare e Cline.</p>
+     OpenRouter, CloudFlare, Cline e Google AI Studio.</p>
   <section id="smart">
     <h2>Smart Models</h2>
     <ol id="smart-list"></ol>
@@ -743,6 +825,7 @@ def main():
         "zen": fetch_zen_models(apenas_free=not args.zen_todos),
         "openrouter": fetch_openrouter_models(),
         "cline": fetch_cline_models(),
+        "google": fetch_google_models(),
     }
     rankings = {"tier1": fetch_smartest_models()}
     rankings["tier2"] = fetch_free_top_models()
@@ -758,9 +841,11 @@ def main():
     tts_resultados = {
         nome: buscar_tts(nome, dados)
         for nome, dados in catalogos_dados.items()
-        if nome != "cline"  # Cline entra só no Smart Models (não tem TTS no data.json)
+        if nome not in ("cline", "google")  # sem TTS no data.json do Cline;
+        # Google entra só no Smart Models (o TTS dele vem de fetch_google_tts)
     }
     tts_resultados["cloudflare"] = fetch_cloudflare_tts()
+    tts_resultados["google"] = fetch_google_tts()
 
     escrever_html(resultados_por_tier, rankings, tts_resultados, datetime.now())
 
